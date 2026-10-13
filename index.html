@@ -3,178 +3,259 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Portal Akademik Terpadu · Institut Teknologi & Sains Mandiri (ITSM)</title>
+  <title>SIAKAD 4.0 · Portal Akademik Institut Teknologi & Sains Mandiri (ITSM)</title>
   <link rel="stylesheet" href="style.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎓</text></svg>">
 </head>
 <body>
 
-  <!-- Top Lab Warning Bar -->
-  <aside class="top-lab-bar" aria-label="Informasi Lingkungan Laboratorium">
-    <span>⚠️ <b>LINGKUNGAN LATIHAN KEAMANAN SIBER:</b> Portal Kampus Fiktif ITSM dilengkapi 4 kerentanan yang sengaja dibuat untuk pengujian.</span>
-    <button onclick="toggleSecurityModal(true)">📋 Panduan Uji Kerentanan (PoC)</button>
+  <!-- Top Government / Ministry Bar -->
+  <aside class="gov-bar" aria-label="Informasi Lembaga">
+    <div class="gov-left">
+      <span>🏛️ <b>KEMENTERIAN PENDIDIKAN TINGGI, SAINS, DAN TEKNOLOGI REPUBLIK INDONESIA</b></span>
+      <span class="gov-badge">SIAKAD CLOUD RESMI</span>
+    </div>
+    <div class="gov-right">
+      <span>Tahun Ajaran: <b>2026/2027 Ganjil</b></span>
+      <span id="liveTimeClock" style="font-family:var(--font-mono); font-weight:600;">--:--:-- WIB</span>
+    </div>
   </aside>
 
-  <!-- Navigation Bar -->
-  <header>
-    <nav class="navbar" aria-label="Navigasi Utama">
-      <div class="nav-container">
-        <a href="index.html" class="brand">
-          <div class="brand-logo" aria-hidden="true">🎓</div>
-          <div class="brand-text">
-            <h1>ITSM ACADEMIC PORTAL</h1>
-            <span>SIAKAD · Institut Teknologi & Sains Mandiri</span>
-          </div>
-        </a>
-
-        <div class="nav-user" id="navUserArea">
-          <!-- Diisi dinamis oleh JavaScript -->
-        </div>
+  <!-- Top Header Navigation -->
+  <header class="portal-header">
+    <div class="brand-group">
+      <div class="brand-emblem" aria-hidden="true">🏛️</div>
+      <div class="brand-info">
+        <h1>INSTITUT TEKNOLOGI & SAINS MANDIRI</h1>
+        <p>Sistem Informasi Akademik Terpadu (SIAKAD 4.0)</p>
       </div>
-    </nav>
+    </div>
+
+    <div class="header-user-section" id="headerUserSection">
+      <!-- Dinamis dari JavaScript -->
+    </div>
   </header>
 
-  <!-- Main Container -->
-  <main class="app-container">
+  <!-- Quick Selector Banner untuk Penguji / Dosen -->
+  <section class="quick-access-banner" aria-label="Akses Cepat Akun">
+    <div class="quick-label">
+      <span>⚡ Akses Cepat Akun Sintetis (Uji Praktikum P06):</span>
+    </div>
+    <div class="quick-btns">
+      <button class="quick-btn-item" onclick="quickLogin('meca')">👨‍🎓 Meca (Mhs - 24781078)</button>
+      <button class="quick-btn-item" onclick="quickLogin('siti')">👩‍🎓 Siti (Mhs - 24781015)</button>
+      <button class="quick-btn-item" onclick="quickLogin('budi')">👨‍🎓 Budi (Mhs - 24781023)</button>
+      <button class="quick-btn-item" onclick="quickLogin('dosen_hendra')">👨‍🏫 Dr. Hendra (Dosen)</button>
+      <button class="quick-btn-item" onclick="quickLogin('admin_itsm')">👑 Admin IT Center</button>
+    </div>
+  </section>
 
-    <!-- Quick Switcher Bar (Memudahkan Penguji / Dosen) -->
-    <section class="quick-login-card" aria-label="Akses Cepat Akun">
-      <div class="quick-title">
-        <span>⚡ Quick Login Akun Sintetis:</span>
-      </div>
-      <div class="quick-buttons">
-        <button class="btn btn-secondary btn-sm" onclick="quickLogin('meca')">👨‍🎓 Meca (Mhs - 24781078)</button>
-        <button class="btn btn-secondary btn-sm" onclick="quickLogin('siti')">👩‍🎓 Siti (Mhs - 24781015)</button>
-        <button class="btn btn-secondary btn-sm" onclick="quickLogin('budi')">👨‍🎓 Budi (Mhs - 24781023)</button>
-        <button class="btn btn-secondary btn-sm" onclick="quickLogin('dosen_hendra')">👨‍🏫 Dr. Hendra (Dosen)</button>
-        <button class="btn btn-secondary btn-sm" onclick="quickLogin('admin_itsm')">👑 Admin IT Center</button>
-      </div>
-    </section>
+  <!-- APP CONTAINER -->
+  <main id="appMain">
 
-    <!-- SECTION 1: AUTHENTICATION FORM -->
-    <section id="authSection" class="auth-wrapper" style="display: none;" aria-label="Formulir Masuk Portal">
-      <div class="auth-header">
-        <h2>Masuk ke SIAKAD ITSM</h2>
-        <p>Gunakan akun civitas akademika Institut Teknologi & Sains Mandiri</p>
+    <!-- VIEW 1: AUTHENTICATION / SSO LOGIN -->
+    <section id="authSection" class="auth-split-wrapper" style="display: none;" aria-label="Formulir Masuk Single Sign-On">
+      <div class="auth-banner-side">
+        <div>
+          <div class="auth-logo-large">🎓</div>
+          <h2>Portal Akademik Terpadu ITSM</h2>
+          <p>Satu akun Single Sign-On (SSO) untuk seluruh layanan akademik, kartu rencana studi, transkrip nilai, e-learning, dan administrasi kampus Institut Teknologi & Sains Mandiri.</p>
+        </div>
+        <div style="font-size:12px; color:#cbd5e1; border-top:1px solid rgba(255,255,255,0.15); padding-top:16px;">
+          <b>Bantuan IT Helpdesk:</b><br>
+          Gedung Rektorat Lt. 2 · Email: <code>puskom@itsm.ac.id</code>
+        </div>
       </div>
 
-      <form id="loginForm">
-        <div class="form-group">
-          <label for="loginUsername">NIM / NIDN / Username:</label>
-          <input type="text" id="loginUsername" class="input-control" placeholder="Contoh: meca atau dosen_hendra" required autocomplete="username">
+      <div class="auth-form-side">
+        <div style="margin-bottom:24px;">
+          <h3 style="font-size:18px; font-weight:800; color:#0f172a;">Masuk ke Akun Anda</h3>
+          <p style="font-size:12.5px; color:#64748b;">Silakan masukkan NIM / NIDN dan kata sandi SSO Anda</p>
         </div>
 
-        <div class="form-group">
-          <label for="loginPassword">Kata Sandi:</label>
-          <input type="password" id="loginPassword" class="input-control" placeholder="••••••••" required autocomplete="current-password">
+        <form id="loginForm">
+          <div class="gov-form-group">
+            <label for="loginUsername">Nomor Induk / Username:</label>
+            <input type="text" id="loginUsername" class="gov-input" placeholder="Contoh: 24781078 atau meca" required autocomplete="username">
+          </div>
+
+          <div class="gov-form-group">
+            <label for="loginPassword">Kata Sandi:</label>
+            <input type="password" id="loginPassword" class="gov-input" placeholder="••••••••" required autocomplete="current-password">
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; font-size:12px;">
+            <label style="display:flex; align-items:center; gap:6px; color:#64748b; cursor:pointer;">
+              <input type="checkbox" checked> Ingat sesi login
+            </label>
+            <a href="javascript:void(0)" onclick="alert('Silakan hubungi Biro Administrasi Akademik untuk reset sandi.')" style="color:#2563eb; text-decoration:none; font-weight:600;">Lupa Sandi?</a>
+          </div>
+
+          <button type="submit" class="btn-gov btn-gov-primary" style="width:100%; padding:11px; font-size:14px;">
+            🔐 Masuk ke Portal SIAKAD
+          </button>
+        </form>
+
+        <div style="margin-top:24px; padding:12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; font-size:11.5px; color:#64748b;">
+          💡 <b>Petunjuk Simulasi SQL Injection:</b> Anda dapat mencoba memasukkan username: <code style="color:#2563eb; font-weight:700;">' OR '1'='1 --</code> dengan kata sandi bebas untuk login otomatis sebagai Administrator!
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 2: AUTHENTIC PORTAL DASHBOARD WITH SIDEBAR -->
+    <div id="dashboardSection" class="portal-layout" style="display: none;">
+      
+      <!-- SIDEBAR NAVIGASI -->
+      <aside class="portal-sidebar">
+        <div>
+          <div class="sidebar-category">Menu Akademik</div>
+          <a class="sidebar-nav-item active" id="nav-beranda" onclick="navTo('beranda')">
+            <span class="nav-icon">🏠</span> <span>Beranda Dashboard</span>
+          </a>
+          <a class="sidebar-nav-item" id="nav-nilai" onclick="navTo('nilai')">
+            <span class="nav-icon">📊</span> <span>KHS &amp; Transkrip Nilai</span>
+          </a>
+          <a class="sidebar-nav-item" id="nav-tugas" onclick="navTo('tugas')">
+            <span class="nav-icon">📚</span> <span>E-Learning &amp; Tugas</span>
+          </a>
+          <a class="sidebar-nav-item" id="nav-forum" onclick="navTo('forum')">
+            <span class="nav-icon">💬</span> <span>Forum Diskusi Kelas</span>
+          </a>
+
+          <!-- KHUSUS DOSEN -->
+          <div id="sidebarDosenGroup" style="display:none;">
+            <div class="sidebar-category">Wewenang Dosen</div>
+            <a class="sidebar-nav-item" id="nav-grading" onclick="navTo('grading')">
+              <span class="nav-icon">📝</span> <span>Input Nilai Mahasiswa</span>
+            </a>
+            <a class="sidebar-nav-item" id="nav-review_tugas" onclick="navTo('review_tugas')">
+              <span class="nav-icon">📂</span> <span>Review Berkas Tugas</span>
+            </a>
+          </div>
+
+          <!-- KHUSUS ADMIN -->
+          <div id="sidebarAdminGroup" style="display:none;">
+            <div class="sidebar-category">Administrasi Sistem</div>
+            <a class="sidebar-nav-item" id="nav-admin_users" onclick="navTo('admin_users')">
+              <span class="nav-icon">👥</span> <span>Manajemen Pengguna</span>
+            </a>
+            <a class="sidebar-nav-item" id="nav-audit_logs" onclick="navTo('audit_logs')">
+              <span class="nav-icon">🛡️</span> <span>Audit Log Keamanan</span>
+            </a>
+          </div>
+
+          <div class="sidebar-category">Pengaturan</div>
+          <a class="sidebar-nav-item" id="nav-profil" onclick="navTo('profil')">
+            <span class="nav-icon">⚙️</span> <span>Biodata &amp; Profil Akun</span>
+          </a>
         </div>
 
-        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">
-          Masuk ke Portal
-        </button>
-      </form>
+        <div style="padding:16px 20px; border-top:1px solid rgba(255,255,255,0.08); font-size:11px; color:#64748b;">
+          SIAKAD ITSM v4.2.1<br>
+          © 2026 Institut Teknologi & Sains Mandiri
+        </div>
+      </aside>
 
-      <!-- Petunjuk SQL Injection Login Bypass -->
-      <div style="margin-top: 24px; padding: 12px; background: rgba(56, 189, 248, 0.08); border: 1px dashed var(--border); border-radius: var(--radius-sm); font-size: 11.5px; color: var(--text-muted);">
-        💡 <b>Tips Pengujian SQLi:</b> Masukkan username: <code style="color:var(--sky);">' OR '1'='1 --</code> dengan kata sandi bebas untuk bypass login sebagai Administrator!
-      </div>
-    </section>
+      <!-- MAIN CONTENT -->
+      <section class="portal-content" id="portalMainContent">
+        <!-- Konten Halaman Dirender Dinamis -->
+      </section>
 
-    <!-- SECTION 2: DASHBOARD VIEW -->
-    <section id="dashboardSection" style="display: none;" aria-label="Dashboard Pengguna">
-      <!-- Tabs Nav -->
-      <nav class="tabs-nav" id="tabsNav" aria-label="Navigasi Menu Portal">
-        <!-- Diisi dinamis berdasarkan hak role -->
-      </nav>
-
-      <!-- Tab Content Area -->
-      <div id="tabContent">
-        <!-- Render dinamis dari app.js -->
-      </div>
-    </section>
+    </div>
 
   </main>
 
-  <!-- Floating PoC Lab Drawer Button -->
-  <button class="security-drawer-toggle" onclick="toggleSecurityModal(true)">
-    <span>🛡️ Uji 4 Kerentanan Web</span>
-  </button>
+  <!-- Floating Lab PoC Trigger Badge -->
+  <div class="security-lab-badge" onclick="toggleSecurityModal(true)">
+    <div class="sec-indicator"></div>
+    <span>Mode Evaluasi Kerentanan (P06)</span>
+  </div>
 
   <!-- Security PoC Modal Overlay -->
-  <div class="security-modal-overlay" id="securityModalOverlay" onclick="if(event.target === this) toggleSecurityModal(false)">
-    <div class="security-modal">
-      <div class="sec-header">
+  <div class="modal-overlay" id="securityModalOverlay" onclick="if(event.target === this) toggleSecurityModal(false)">
+    <div class="modal-content-card">
+      <div class="modal-top-header">
         <div>
-          <h3 style="font-size:18px; font-weight:800; color:#fff;">🛡️ Laboratorium Pengujian 4 Kerentanan Sengaja</h3>
-          <p style="font-size:12.5px; color:var(--text-sub); margin-top:2px;">Institut Teknologi & Sains Mandiri (ITSM) · Panduan Proof of Concept (PoC)</p>
+          <h3 style="font-size:16px; font-weight:800; color:#fff;">🛡️ Laboratorium Pengujian 4 Kerentanan Web (OWASP)</h3>
+          <p style="font-size:11.5px; color:#94a3b8; margin-top:2px;">Institut Teknologi &amp; Sains Mandiri · Panduan Pengujian Proof of Concept (PoC)</p>
         </div>
-        <button class="btn btn-secondary btn-sm" onclick="toggleSecurityModal(false)">✕ Tutup</button>
+        <button class="btn-gov btn-gov-secondary btn-gov-sm" onclick="toggleSecurityModal(false)">✕ Tutup</button>
       </div>
 
-      <div class="sec-body">
-        
+      <div class="modal-body-pad">
+
         <!-- KERENTANAN 1: STORED XSS -->
-        <div class="vuln-item-card">
-          <span class="vuln-badge">1. Stored XSS (Cross-Site Scripting)</span>
-          <h4 style="font-size:14px; margin-bottom:4px; color:#fff;">Injeksi Skrip Permanen pada Forum Diskusi</h4>
-          <p style="font-size:12.5px; color:var(--text-sub);">
-            Input teks komentar tidak disanitasi dan disimpan di basis data, kemudian dirender langsung menggunakan <code>innerHTML</code>. Skrip JavaScript yang disisipkan akan dieksekusi secara otomatis di browser siapapun yang membuka forum diskusi.
+        <div class="lab-card-detail">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <b style="font-size:13.5px; color:#0f172a;">1. Stored XSS (Cross-Site Scripting)</b>
+            <span class="status-pill pill-danger">Celah Aktif</span>
+          </div>
+          <p style="font-size:12.5px; color:#475569; margin-bottom:8px;">
+            Komentar pada <b>Forum Diskusi Kelas</b> disimpan permanen di database dan dirender ke HTML menggunakan <code>innerHTML</code> tanpa sanitasi. Script jahat akan tereksekusi pada browser civitas akademika yang membuka forum.
           </p>
-          <div class="poc-box">
-            <code>&lt;img src=x onerror="alert('Stored XSS Ditemukan! Origin: ' + location.origin)"&gt;</code>
-            <button class="btn btn-primary btn-sm" onclick="toggleSecurityModal(false); switchTab('forum'); fillXSSPayload(1)">Uji Sekarang</button>
+          <div style="background:#f1f5f9; padding:8px 12px; border-radius:6px; font-family:var(--font-mono); font-size:11.5px; color:#2563eb; display:flex; justify-content:space-between; align-items:center;">
+            <code>&lt;img src=x onerror="alert('🔴 [STORED XSS TERPICU] Origin: ' + location.origin)"&gt;</code>
+            <button class="btn-gov btn-gov-primary btn-gov-sm" onclick="toggleSecurityModal(false); navTo('forum'); fillXSSPayload(1)">⚡ Uji Sekarang</button>
           </div>
         </div>
 
         <!-- KERENTANAN 2: IDOR -->
-        <div class="vuln-item-card">
-          <span class="vuln-badge">2. IDOR / Kontrol Akses Lemah</span>
-          <h4 style="font-size:14px; margin-bottom:4px; color:#fff;">Insecure Direct Object Reference pada KHS & Transkrip Nilai</h4>
-          <p style="font-size:12.5px; color:var(--text-sub);">
-            Halaman KHS mengambil data nilai mahasiswa berdasarkan parameter identitas (NIM) tanpa memverifikasi apakah akun mahasiswa yang sedang login berhak melihat data tersebut. Mahasiswa A (Meca) dapat melihat transkrip mahasiswa B (Siti / Budi).
+        <div class="lab-card-detail">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <b style="font-size:13.5px; color:#0f172a;">2. IDOR / Kontrol Akses Lemah</b>
+            <span class="status-pill pill-danger">Celah Aktif</span>
+          </div>
+          <p style="font-size:12.5px; color:#475569; margin-bottom:8px;">
+            Halaman <b>KHS &amp; Transkrip Nilai</b> mengambil data nilai mahasiswa berdasarkan parameter identitas (NIM) tanpa memverifikasi hak milik sesi akun aktif. Mahasiswa A (Meca) dapat melihat transkrip nilai rahasia mahasiswa B (Siti / Budi).
           </p>
-          <div class="poc-box">
-            <code>Ganti target_nim=24781015 pada menu Lihat Nilai</code>
-            <button class="btn btn-primary btn-sm" onclick="toggleSecurityModal(false); quickLogin('meca'); switchTab('nilai'); changeIdorNim('24781015')">Uji Sekarang</button>
+          <div style="background:#f1f5f9; padding:8px 12px; border-radius:6px; font-family:var(--font-mono); font-size:11.5px; color:#2563eb; display:flex; justify-content:space-between; align-items:center;">
+            <code>Ubah parameter NIM target ke: 24781015</code>
+            <button class="btn-gov btn-gov-primary btn-gov-sm" onclick="toggleSecurityModal(false); quickLogin('meca'); navTo('nilai'); changeIdorNim('24781015')">⚡ Uji Sekarang</button>
           </div>
         </div>
 
         <!-- KERENTANAN 3: ESKALASI HAK AKSES -->
-        <div class="vuln-item-card">
-          <span class="vuln-badge">3. Eskalasi Hak Akses (Privilege Escalation)</span>
-          <h4 style="font-size:14px; margin-bottom:4px; color:#fff;">Manipulasi Parameter Role Pengguna via Form Profil</h4>
-          <p style="font-size:12.5px; color:var(--text-sub);">
-            Sistem mempercayai parameter <code>role</code> yang dikirim dari klien pada pengaturan profil akun mahasiswa tanpa validasi izin wewenang (Mass Assignment / Role Tampering). Mahasiswa biasa dapat menaikkan hak aksesnya menjadi <b>Dosen</b> atau <b>Admin</b>.
+        <div class="lab-card-detail">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <b style="font-size:13.5px; color:#0f172a;">3. Eskalasi Hak Akses (Privilege Escalation)</b>
+            <span class="status-pill pill-danger">Celah Aktif</span>
+          </div>
+          <p style="font-size:12.5px; color:#475569; margin-bottom:8px;">
+            Parameter <code>role</code> pada formulir <b>Biodata &amp; Profil Akun</b> dapat dimanipulasi oleh klien tanpa otorisasi backend. Mahasiswa biasa dapat menaikkan hak aksesnya menjadi <b>Dosen</b> atau <b>Admin</b> secara instan.
           </p>
-          <div class="poc-box">
-            <code>Ubah role='admin' pada Profil Mahasiswa</code>
-            <button class="btn btn-primary btn-sm" onclick="toggleSecurityModal(false); quickLogin('meca'); switchTab('profil'); escalateToAdminQuick()">Uji Sekarang</button>
+          <div style="background:#f1f5f9; padding:8px 12px; border-radius:6px; font-family:var(--font-mono); font-size:11.5px; color:#2563eb; display:flex; justify-content:space-between; align-items:center;">
+            <code>Ganti role menjadi 'admin' di Pengaturan Profil</code>
+            <button class="btn-gov btn-gov-primary btn-gov-sm" onclick="toggleSecurityModal(false); quickLogin('meca'); navTo('profil'); escalateToAdminQuick()">⚡ Uji Sekarang</button>
           </div>
         </div>
 
         <!-- KERENTANAN 4: VALIDASI BERKAS LEMAH -->
-        <div class="vuln-item-card">
-          <span class="vuln-badge">4. Validasi Berkas Lemah (Unrestricted File Upload)</span>
-          <h4 style="font-size:14px; margin-bottom:4px; color:#fff;">Unggah Berkas Eksekutabel / Web Skrip (.html, .svg) pada Tugas</h4>
-          <p style="font-size:12.5px; color:var(--text-sub);">
-            Formulir pengumpulan tugas menerima berkas dengan tipe ekstensi apapun tanpa pemeriksaan MIME type atau filtering ekstensi berbahaya. Berkas <code>.html</code> berisi payload jahat dapat diunggah dan dieksekusi saat dibuka oleh penguji/dosen.
+        <div class="lab-card-detail">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <b style="font-size:13.5px; color:#0f172a;">4. Validasi Berkas Lemah (Unrestricted Upload)</b>
+            <span class="status-pill pill-danger">Celah Aktif</span>
+          </div>
+          <p style="font-size:12.5px; color:#475569; margin-bottom:8px;">
+            Formulir <b>E-Learning &amp; Pengumpulan Tugas</b> tidak memvalidasi ekstensi file atau tipe MIME. File script web <code>.html</code> berisi payload jahat dapat diunggah dan dieksekusi langsung saat dibuka.
           </p>
-          <div class="poc-box">
-            <code>Unggah payload_backdoor.html dan buka berkas via Review Tugas</code>
-            <button class="btn btn-primary btn-sm" onclick="toggleSecurityModal(false); quickLogin('meca'); switchTab('tugas'); simulateMaliciousUpload()">Uji Sekarang</button>
+          <div style="background:#f1f5f9; padding:8px 12px; border-radius:6px; font-family:var(--font-mono); font-size:11.5px; color:#2563eb; display:flex; justify-content:space-between; align-items:center;">
+            <code>Unggah payload_backdoor.html dan buka file</code>
+            <button class="btn-gov btn-gov-primary btn-gov-sm" onclick="toggleSecurityModal(false); quickLogin('meca'); navTo('tugas'); simulateMaliciousUpload()">⚡ Uji Sekarang</button>
           </div>
         </div>
 
         <!-- BONUS: SQL INJECTION -->
-        <div class="vuln-item-card" style="border-color:rgba(56, 189, 248, 0.3);">
-          <span class="vuln-badge" style="background:rgba(56, 189, 248, 0.2); color:var(--sky); border-color:rgba(56, 189, 248, 0.4);">Bonus: SQL Injection</span>
-          <h4 style="font-size:14px; margin-bottom:4px; color:#fff;">Bypass Otentikasi Login Admin</h4>
-          <p style="font-size:12.5px; color:var(--text-sub);">
-            Klausa WHERE pada query login dibypass menggunakan statement tautologi <code>' OR '1'='1</code> sehingga penyerang dapat masuk langsung sebagai Administrator tanpa mengetahui kata sandi sebenarnya.
+        <div class="lab-card-detail" style="border-left-color:#3b82f6;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <b style="font-size:13.5px; color:#0f172a;">Bonus: SQL Injection (Login Bypass)</b>
+            <span class="status-pill pill-info">Celah Aktif</span>
+          </div>
+          <p style="font-size:12.5px; color:#475569; margin-bottom:8px;">
+            Klausa login memproses query mentah yang dapat dibypass dengan statement tautologi <code>' OR '1'='1 --</code>.
           </p>
-          <div class="poc-box">
+          <div style="background:#f1f5f9; padding:8px 12px; border-radius:6px; font-family:var(--font-mono); font-size:11.5px; color:#2563eb; display:flex; justify-content:space-between; align-items:center;">
             <code>Username: ' OR '1'='1 -- | Password: sembarang</code>
-            <button class="btn btn-primary btn-sm" onclick="toggleSecurityModal(false); logout(); login(`' OR '1'='1 --`, 'pass')">Uji Sekarang</button>
+            <button class="btn-gov btn-gov-primary btn-gov-sm" onclick="toggleSecurityModal(false); logout(); login(`' OR '1'='1 --`, 'pass')">⚡ Uji Sekarang</button>
           </div>
         </div>
 
@@ -182,8 +263,8 @@
     </div>
   </div>
 
-  <!-- Toast Notification Container -->
-  <div class="toast-container" id="toastContainer"></div>
+  <!-- Toast Notification Wrapper -->
+  <div class="toast-wrap" id="toastContainer"></div>
 
   <!-- Scripts -->
   <script src="app.js"></script>

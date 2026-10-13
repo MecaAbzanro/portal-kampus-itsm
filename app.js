@@ -1,22 +1,10 @@
 /**
  * SISTEM INFORMASI AKADEMIK TERPADU (SIAKAD 4.0)
  * INSTITUT TEKNOLOGI & SAINS MANDIRI (ITSM)
- * Praktikum Keamanan Sistem Informasi
- * 
- * Fitur Role Realistis:
- * - Mahasiswa: Beranda Dashboard, KHS & Transkrip, E-Learning/Tugas, Forum Kelas, Biodata
- * - Dosen: Penilaian Mahasiswa, Review Tugas
- * - Admin: Manajemen Akun Pengguna, Audit Log Keamanan
- * 
- * 4 Kerentanan Sengaja:
- * 1. Stored XSS (Forum Diskusi Kelas)
- * 2. IDOR (KHS & Transkrip Nilai)
- * 3. Eskalasi Hak Akses (Biodata & Pengaturan Profil)
- * 4. Validasi Berkas Lemah (E-Learning & Unggah Tugas)
- * + Bonus: SQL Injection pada Login SSO
+ * Praktikum Keamanan Sistem Informasi (P06)
  */
 
-const DB_VERSION = "itsm_siakad_v3";
+const DB_VERSION = "itsm_db_v4_siakad";
 
 const DEFAULT_USERS = [
   {
@@ -30,7 +18,7 @@ const DEFAULT_USERS = [
     jurusan: "Teknologi Informasi",
     semester: 5,
     email: "meca.24781078@student.itsm.ac.id",
-    status: "Aktif",
+    status: "Aktif (Reguler Pagi)",
     dosen_pa: "Dr. Ir. Hendra Wijaya, M.Kom.",
     ipk: 3.88,
     sks: 94
@@ -46,7 +34,7 @@ const DEFAULT_USERS = [
     jurusan: "Teknologi Informasi",
     semester: 5,
     email: "siti.24781015@student.itsm.ac.id",
-    status: "Aktif",
+    status: "Aktif (Reguler Pagi)",
     dosen_pa: "Ratna Kusuma, M.T.",
     ipk: 3.42,
     sks: 94
@@ -113,7 +101,7 @@ const DEFAULT_GRADES = [
   { nim: "24781078", kode: "IF502", matkul: "Pemrograman Web Lanjut & API", sks: 3, tugas: 90, uts: 88, uas: 92, huruf: "A", bobot: 4.0, dosen: "Dr. Ir. Hendra Wijaya, M.Kom." },
   { nim: "24781078", kode: "IF503", matkul: "Manajemen Basis Data & SQL", sks: 3, tugas: 85, uts: 86, uas: 88, huruf: "A-", bobot: 3.75, dosen: "Ratna Kusuma, M.T." },
   { nim: "24781078", kode: "IF504", matkul: "Rekayasa Perangkat Lunak", sks: 3, tugas: 88, uts: 90, uas: 87, huruf: "A-", bobot: 3.75, dosen: "Ratna Kusuma, M.T." },
-  
+
   // Siti (NIM: 24781015)
   { nim: "24781015", kode: "IF501", matkul: "Keamanan Sistem Informasi & Siber", sks: 3, tugas: 82, uts: 78, uas: 80, huruf: "B+", bobot: 3.5, dosen: "Dr. Ir. Hendra Wijaya, M.Kom." },
   { nim: "24781015", kode: "IF502", matkul: "Pemrograman Web Lanjut & API", sks: 3, tugas: 85, uts: 80, uas: 84, huruf: "B+", bobot: 3.5, dosen: "Dr. Ir. Hendra Wijaya, M.Kom." },
@@ -206,7 +194,6 @@ const DEFAULT_SUBMISSIONS = [
   }
 ];
 
-// Helper Storage
 function getStorage(key, fallback) {
   try {
     const data = localStorage.getItem(key);
@@ -222,7 +209,7 @@ function setStorage(key, val) {
   } catch (e) {}
 }
 
-// Inisialisasi Database
+// Inisialisasi DB
 if (!localStorage.getItem(DB_VERSION)) {
   localStorage.setItem(DB_VERSION, "true");
   setStorage("itsm_users", DEFAULT_USERS);
@@ -230,27 +217,26 @@ if (!localStorage.getItem(DB_VERSION)) {
   setStorage("itsm_threads", DEFAULT_THREADS);
   setStorage("itsm_submissions", DEFAULT_SUBMISSIONS);
   setStorage("itsm_logs", [
-    { time: new Date().toLocaleTimeString(), action: "SIAKAD ITSM Booted", user: "system", ip: "127.0.0.1" }
+    { time: new Date().toLocaleTimeString(), action: "SIAKAD 4.0 Started", user: "system", ip: "127.0.0.1" }
   ]);
 }
 
+// Selalu pastikan user aktif (Default: Meca - 24781078)
 let currentUser = getStorage("itsm_current_user", null);
+if (!currentUser) {
+  currentUser = { ...DEFAULT_USERS[0] };
+  setStorage("itsm_current_user", currentUser);
+}
+
 let currentPage = "beranda";
 
-// Inisialisasi Dokumen
 document.addEventListener("DOMContentLoaded", () => {
   startClock();
-  setupEvents();
-
-  if (currentUser) {
-    showDashboard();
-  } else {
-    // Default masuk sebagai Meca agar langsung menampilkan dashboard realistik
-    quickLogin("meca");
-  }
+  updateHeaderProfile();
+  updateNavRoleTabs();
+  navTo("beranda");
 });
 
-// Jam Digital
 function startClock() {
   const clockElem = document.getElementById("liveTimeClock");
   function tick() {
@@ -263,12 +249,11 @@ function startClock() {
   setInterval(tick, 1000);
 }
 
-// Toast Notifikasi
 function showToast(msg, isWarn = false) {
   const container = document.getElementById("toastContainer");
   if (!container) return;
   const t = document.createElement("div");
-  t.className = "toast-item";
+  t.className = "toast-msg";
   if (isWarn) t.style.borderLeftColor = "#ef4444";
   t.innerHTML = msg;
   container.appendChild(t);
@@ -278,7 +263,6 @@ function showToast(msg, isWarn = false) {
   }, 4000);
 }
 
-// Log Aktivitas
 function logActivity(action, details = "") {
   const logs = getStorage("itsm_logs", []);
   logs.unshift({
@@ -290,116 +274,61 @@ function logActivity(action, details = "") {
   setStorage("itsm_logs", logs.slice(0, 50));
 }
 
-// Render User Section di Header
-function renderHeaderUser() {
-  const area = document.getElementById("headerUserSection");
-  if (!area) return;
+function updateHeaderProfile() {
+  const avatarElem = document.getElementById("headerAvatarText");
+  const nameElem = document.getElementById("headerUserName");
+  const subElem = document.getElementById("headerUserSub");
+  const switcher = document.getElementById("headerRoleSwitcher");
 
-  if (!currentUser) {
-    area.innerHTML = `
-      <button class="btn-gov btn-gov-primary btn-gov-sm" onclick="showAuth()">Masuk SSO</button>
-    `;
-    return;
-  }
-
-  const initial = currentUser.nama ? currentUser.nama.charAt(0) : "U";
-  area.innerHTML = `
-    <div class="user-profile-widget" onclick="navTo('profil')">
-      <div class="avatar-img">${initial}</div>
-      <div class="user-meta-text">
-        <div class="user-name-title">${escapeHTML(currentUser.nama)}</div>
-        <div class="user-sub-id">${escapeHTML(currentUser.nomor_induk)} · <b style="text-transform:uppercase; color:#2563eb;">${currentUser.role}</b></div>
-      </div>
-    </div>
-    <button class="btn-gov btn-gov-secondary btn-gov-sm" onclick="logout()" title="Keluar dari sesi portal">
-      🚪 Keluar
-    </button>
-  `;
+  if (avatarElem) avatarElem.innerText = currentUser.nama ? currentUser.nama.charAt(0) : "U";
+  if (nameElem) nameElem.innerText = currentUser.nama || "Pengguna";
+  if (subElem) subElem.innerText = `${currentUser.nomor_induk} · ${currentUser.role.toUpperCase()}`;
+  if (switcher) switcher.value = currentUser.username || "meca";
 }
 
-// Auth Controller
-function showAuth() {
-  document.getElementById("authSection").style.display = "flex";
-  document.getElementById("dashboardSection").style.display = "none";
+function updateNavRoleTabs() {
+  const tabGrading = document.getElementById("tab-grading");
+  const tabReview = document.getElementById("tab-review_tugas");
+  const tabAdminUsers = document.getElementById("tab-admin_users");
+  const tabAuditLogs = document.getElementById("tab-audit_logs");
+
+  const isDosen = currentUser.role === "dosen" || currentUser.role === "admin";
+  const isAdmin = currentUser.role === "admin";
+
+  if (tabGrading) tabGrading.style.display = isDosen ? "flex" : "none";
+  if (tabReview) tabReview.style.display = isDosen ? "flex" : "none";
+  if (tabAdminUsers) tabAdminUsers.style.display = isAdmin ? "flex" : "none";
+  if (tabAuditLogs) tabAuditLogs.style.display = isAdmin ? "flex" : "none";
 }
 
-function showDashboard() {
-  document.getElementById("authSection").style.display = "none";
-  document.getElementById("dashboardSection").style.display = "flex";
-  renderHeaderUser();
-  updateSidebarMenu();
-  navTo(currentPage);
-}
-
-function login(username, password) {
+function quickLogin(username) {
   const users = getStorage("itsm_users", DEFAULT_USERS);
-
-  // SIMULASI SQL INJECTION
-  if (username.includes("' OR '1'='1") || username.includes("' OR 1=1") || username.includes("'--")) {
-    logActivity("⚠️ SQL INJECTION AUTH BYPASS", `Statement: "${username}" berhasil membypass login!`);
-    showToast("⚠️ <b>SQL Injection Terpicu!</b> Autentikasi berhasil dibypass via <code>' OR '1'='1</code>. Masuk sebagai Super Administrator!", true);
-    const adminUser = users.find(u => u.role === "admin") || users[0];
-    setCurrentUser(adminUser);
-    return;
+  const u = users.find(x => x.username === username);
+  if (u) {
+    currentUser = { ...u };
+    setStorage("itsm_current_user", currentUser);
+    updateHeaderProfile();
+    updateNavRoleTabs();
+    showToast(`Beralih ke akun: <b>${u.nama}</b> [${u.role.toUpperCase()}]`);
+    navTo("beranda");
   }
-
-  const found = users.find(u => (u.username === username || u.nomor_induk === username) && u.password === password);
-  if (found) {
-    setCurrentUser(found);
-    showToast(`Selamat datang kembali, <b>${found.nama}</b>!`);
-    logActivity("Login Berhasil", `User: ${found.username} (${found.role})`);
-  } else {
-    showToast("❌ Kredensial tidak valid. Silakan periksa kembali nomor induk atau sandi Anda.", true);
-  }
-}
-
-function setCurrentUser(user) {
-  currentUser = { ...user };
-  setStorage("itsm_current_user", currentUser);
-  currentPage = "beranda";
-  showDashboard();
 }
 
 function logout() {
-  logActivity("Logout Pengguna", `User: ${currentUser?.username || "Anonim"}`);
-  currentUser = null;
-  localStorage.removeItem("itsm_current_user");
-  renderHeaderUser();
-  showAuth();
-  showToast("Anda telah keluar dari Portal SIAKAD ITSM.");
-}
-
-function quickLogin(uname) {
-  const users = getStorage("itsm_users", DEFAULT_USERS);
-  const u = users.find(x => x.username === uname);
-  if (u) {
-    setCurrentUser(u);
-    showToast(`Beralih ke akun resmi: <b>${u.nama}</b> [${u.role.toUpperCase()}]`);
-  }
-}
-
-// Navigasi Sidebar
-function updateSidebarMenu() {
-  const dosenGroup = document.getElementById("sidebarDosenGroup");
-  const adminGroup = document.getElementById("sidebarAdminGroup");
-
-  if (dosenGroup) {
-    dosenGroup.style.display = (currentUser.role === "dosen" || currentUser.role === "admin") ? "block" : "none";
-  }
-  if (adminGroup) {
-    adminGroup.style.display = (currentUser.role === "admin") ? "block" : "none";
-  }
+  // Reset kembali ke akun utama Meca dengan konfirmasi
+  showToast("Sesi di-reset ke akun utama Mahasiswa (Meca).");
+  quickLogin("meca");
 }
 
 function navTo(pageId) {
   currentPage = pageId;
-  document.querySelectorAll(".sidebar-nav-item").forEach(item => {
+  document.querySelectorAll(".nav-tab-item").forEach(item => {
     item.classList.remove("active");
   });
-  const activeNav = document.getElementById(`nav-${pageId}`);
-  if (activeNav) activeNav.classList.add("active");
+  const activeTab = document.getElementById(`tab-${pageId}`);
+  if (activeTab) activeTab.classList.add("active");
 
-  const container = document.getElementById("portalMainContent");
+  const container = document.getElementById("siakadMainContent");
   if (!container) return;
 
   switch (pageId) {
@@ -433,100 +362,99 @@ function navTo(pageId) {
     default:
       renderBerandaView(container);
   }
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 // ==========================================
-// 1. BERANDA DASHBOARD AKADEMIK REALISTIS
+// 1. DASHBOARD UTAMA
 // ==========================================
 function renderBerandaView(container) {
   const isMahasiswa = currentUser.role === "mahasiswa";
 
   container.innerHTML = `
-    <!-- Header Halaman -->
-    <div class="page-header-row">
-      <div class="page-title">
-        <h2>Dashboard Akademik Terpadu</h2>
-        <p>Selamat Datang di Sistem Informasi Akademik Institut Teknologi &amp; Sains Mandiri</p>
-      </div>
-      <div class="academic-period-badge">
-        📅 Semester Ganjil 2026/2027 · Minggu Efektif Ke-8
-      </div>
-    </div>
-
-    <!-- Banner Sambutan Resmi -->
-    <div class="academic-card" style="background: linear-gradient(135deg, #1e3a8a, #1e40af); color:#ffffff; border:none;">
-      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
-        <div>
-          <div style="font-size:12px; text-transform:uppercase; color:#93c5fd; font-weight:700; letter-spacing:0.5px;">Selamat Datang Kembali,</div>
-          <h3 style="font-size:22px; font-weight:800; margin-top:2px;">${escapeHTML(currentUser.nama)}</h3>
-          <p style="font-size:13px; color:#bfdbfe; margin-top:4px;">
-            ${escapeHTML(currentUser.nomor_induk)} · ${escapeHTML(currentUser.prodi || 'Civitas Akademika')} · Status: <span style="background:#10b981; color:#fff; padding:2px 8px; border-radius:4px; font-weight:700; font-size:11px;">${currentUser.status || 'Aktif'}</span>
+    <!-- HERO STUDENT PROFILE BANNER (KTM DIGITAL) -->
+    <div class="student-hero-banner">
+      <div class="student-hero-left">
+        <div class="student-photo-frame">
+          ${currentUser.nama.charAt(0)}
+        </div>
+        <div class="student-hero-meta">
+          <div style="font-size:11.5px; text-transform:uppercase; color:#93c5fd; font-weight:700; letter-spacing:0.5px;">
+            PORTAL CIVITAS AKADEMIKA
+          </div>
+          <h2>${escapeHTML(currentUser.nama)}</h2>
+          <p>
+            Nomor Induk: <b>${escapeHTML(currentUser.nomor_induk)}</b> &middot; 
+            Program Studi: <b>${escapeHTML(currentUser.prodi || 'Teknologi Informasi')}</b>
+            <span class="status-tag-active">${currentUser.status || 'Aktif'}</span>
           </p>
         </div>
-        <div style="text-align:right;">
-          <div style="font-size:11.5px; color:#93c5fd;">Dosen Pembimbing Akademik (PA):</div>
-          <div style="font-size:14px; font-weight:700;">${escapeHTML(currentUser.dosen_pa || 'Dr. Ir. Hendra Wijaya, M.Kom.')}</div>
+      </div>
+      <div style="text-align:right; font-size:12px;">
+        <div style="color:#bfdbfe;">Dosen Pembimbing Akademik:</div>
+        <div style="font-size:14px; font-weight:700;">${escapeHTML(currentUser.dosen_pa || 'Dr. Ir. Hendra Wijaya, M.Kom.')}</div>
+      </div>
+    </div>
+
+    <!-- STATS ROW -->
+    <div class="stats-grid-row">
+      <div class="stat-item-box">
+        <div class="stat-icon-wrapper icon-blue">📈</div>
+        <div class="stat-text-wrap">
+          <div class="stat-label-title">IPK Kumulatif</div>
+          <div class="stat-number-big">${isMahasiswa ? (currentUser.ipk || "3.88") : "4.00"}</div>
+          <div class="stat-sub-note">Skala 4.00 (Sangat Memuaskan)</div>
+        </div>
+      </div>
+
+      <div class="stat-item-box">
+        <div class="stat-icon-wrapper icon-green">📚</div>
+        <div class="stat-text-wrap">
+          <div class="stat-label-title">Total SKS Tempuh</div>
+          <div class="stat-number-big">${isMahasiswa ? (currentUser.sks || "94") : "24"} SKS</div>
+          <div class="stat-sub-note">Syarat Kelulusan: 110 SKS</div>
+        </div>
+      </div>
+
+      <div class="stat-item-box">
+        <div class="stat-icon-wrapper icon-amber">📅</div>
+        <div class="stat-text-wrap">
+          <div class="stat-label-title">Presensi Kehadiran</div>
+          <div class="stat-number-big">96.8%</div>
+          <div class="stat-sub-note">Kehadiran Perkuliahan</div>
+        </div>
+      </div>
+
+      <div class="stat-item-box">
+        <div class="stat-icon-wrapper icon-purple">💳</div>
+        <div class="stat-text-wrap">
+          <div class="stat-label-title">Status Registrasi UKT</div>
+          <div class="stat-number-big" style="color:#059669; font-size:17px;">LUNAS (REGULER)</div>
+          <div class="stat-sub-note">Semester Ganjil 2026/2027</div>
         </div>
       </div>
     </div>
 
-    <!-- STATS CARDS REALISTIS -->
-    <div class="stats-grid-4">
-      <div class="stat-box">
-        <div class="stat-icon-wrap stat-icon-blue">📈</div>
-        <div class="stat-content">
-          <div class="stat-label">IPK Kumulatif</div>
-          <div class="stat-value">${isMahasiswa ? (currentUser.ipk || "3.88") : "4.00"}</div>
-          <div class="stat-desc">Skala 4.00 (Sangat Memuaskan)</div>
-        </div>
-      </div>
-
-      <div class="stat-box">
-        <div class="stat-icon-wrap stat-icon-green">📚</div>
-        <div class="stat-content">
-          <div class="stat-label">Total SKS Tempuh</div>
-          <div class="stat-value">${isMahasiswa ? (currentUser.sks || "94") : "24"} SKS</div>
-          <div class="stat-desc">Batas Maksimal: 144 SKS</div>
-        </div>
-      </div>
-
-      <div class="stat-box">
-        <div class="stat-icon-wrap stat-icon-amber">📅</div>
-        <div class="stat-content">
-          <div class="stat-label">Presensi Kehadiran</div>
-          <div class="stat-value">96.8%</div>
-          <div class="stat-desc">Syarat Minimum Ujian: 80%</div>
-        </div>
-      </div>
-
-      <div class="stat-box">
-        <div class="stat-icon-wrap stat-icon-purple">💳</div>
-        <div class="stat-content">
-          <div class="stat-label">Status Keuangan UKT</div>
-          <div class="stat-value" style="font-size:16px; color:#10b981; font-weight:800;">LUNAS (REGULER)</div>
-          <div class="stat-desc">Virtual Account BNI Virtual</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- JADWAL KULIAH HARI INI -->
+    <!-- JADWAL PERKULIAHAN -->
     <div class="academic-card">
-      <div class="card-header-styled">
-        <h3>📅 Jadwal Perkuliahan &amp; Praktikum Semester Ini</h3>
-        <button class="btn-gov btn-gov-secondary btn-gov-sm" onclick="navTo('nilai')">Lihat KHS Lengkap &rarr;</button>
+      <div class="card-header-line">
+        <div class="card-title-text">
+          <span>📅</span> <span>Jadwal Perkuliahan &amp; Praktikum Laboratorium Semester Ini</span>
+        </div>
+        <button class="btn-siakad btn-secondary btn-sm" onclick="navTo('nilai')">Lihat KHS Lengkap &rarr;</button>
       </div>
 
-      <div class="table-container">
-        <table class="academic-table">
+      <div class="table-responsive-box">
+        <table class="siakad-table">
           <thead>
             <tr>
               <th>Hari &amp; Jam</th>
               <th>Kode</th>
               <th>Mata Kuliah</th>
               <th>SKS</th>
-              <th>Ruang Kuliah</th>
+              <th>Ruang Kuliah / Lab</th>
               <th>Dosen Pengampu</th>
-              <th>Status Pertemuan</th>
+              <th>Status</th>
             </tr>
           </thead>
           <tbody>
@@ -534,11 +462,11 @@ function renderBerandaView(container) {
               <tr>
                 <td><b>${sch.hari}</b><br><small style="color:#64748b;">${sch.jam}</small></td>
                 <td><code>${sch.kode}</code></td>
-                <td><b style="color:#1e3a8a;">${sch.matkul}</b></td>
+                <td><b style="color:#1e40af;">${sch.matkul}</b></td>
                 <td>${sch.sks} SKS</td>
-                <td><span class="status-pill pill-info">${sch.ruang}</span></td>
+                <td><span style="background:#eff6ff; color:#1d4ed8; font-weight:700; padding:2px 8px; border-radius:4px; font-size:11.5px;">${sch.ruang}</span></td>
                 <td>${sch.dosen}</td>
-                <td><span class="status-pill pill-success">Pertemuan Ke-${i + 7}</span></td>
+                <td><span style="background:#ecfdf5; color:#059669; font-weight:700; padding:2px 8px; border-radius:4px; font-size:11px;">Pertemuan ${i + 7}</span></td>
               </tr>
             `).join("")}
           </tbody>
@@ -546,28 +474,30 @@ function renderBerandaView(container) {
       </div>
     </div>
 
-    <!-- PENGUMUMAN RESMI KAMPUS -->
+    <!-- PENGUMUMAN BAAK -->
     <div class="academic-card">
-      <div class="card-header-styled">
-        <h3>📢 Pengumuman Resmi Biro Administrasi Akademik (BAAK)</h3>
-        <span style="font-size:12px; color:#64748b;">Pemberitahuan Terkini</span>
+      <div class="card-header-line">
+        <div class="card-title-text">
+          <span>📢</span> <span>Pemberitahuan Resmi Biro Administrasi Akademik (BAAK)</span>
+        </div>
+        <span style="font-size:11.5px; color:#64748b;">Semester Ganjil 2026/2027</span>
       </div>
 
       <div style="display:flex; flex-direction:column; gap:12px;">
         <div style="padding:12px 14px; background:#f8fafc; border-left:4px solid #2563eb; border-radius:6px;">
-          <b style="color:#0f172a; font-size:13.5px;">Batas Akhir Unggah Berkas Laporan Praktikum Analisis Keamanan Web</b>
-          <p style="font-size:12.5px; color:#475569; margin-top:2px;">
-            Mahasiswa diwajibkan mengumpulkan laporan pengujian penetrasi web dan skenario uji celah keamanan sebelum batas waktu evaluasi semester ganjil.
+          <b style="color:#0f172a; font-size:13px;">Pengumpulan Berkas Laporan Praktikum Evaluasi Keamanan Web (P06)</b>
+          <p style="font-size:12px; color:#475569; margin-top:3px;">
+            Seluruh mahasiswa program studi Teknologi Informasi diwajibkan mengunggah berkas laporan pengujian celah keamanan web sebelum jadwal penutupan portal e-learning.
           </p>
-          <div style="font-size:11px; color:#94a3b8; margin-top:4px;">Diposting oleh: Biro Akademik · 13 Oktober 2026</div>
+          <div style="font-size:11px; color:#94a3b8; margin-top:4px;">Diposting oleh: Biro Akademik &middot; 13 Oktober 2026</div>
         </div>
 
         <div style="padding:12px 14px; background:#f8fafc; border-left:4px solid #10b981; border-radius:6px;">
-          <b style="color:#0f172a; font-size:13.5px;">Pendaftaran Uji Kompetensi Keamanan Siber &amp; Ethical Hacking</b>
-          <p style="font-size:12.5px; color:#475569; margin-top:2px;">
-            Pusat Sertifikasi ITSM membuka pendaftaran sertifikasi kompetensi bidang Cybersecurity bagi mahasiswa tingkat akhir dengan IPK minimum 3.00.
+          <b style="color:#0f172a; font-size:13px;">Pendaftaran Uji Sertifikasi Kompetensi Cyber Security &amp; Web Defense</b>
+          <p style="font-size:12px; color:#475569; margin-top:3px;">
+            Pusat Sertifikasi Profesi ITSM membuka pendaftaran uji sertifikasi kompetensi bidang Cybersecurity bagi mahasiswa tingkat akhir dengan IPK minimum 3.00.
           </p>
-          <div style="font-size:11px; color:#94a3b8; margin-top:4px;">Diposting oleh: Pusat Komputer ITSM · 10 Oktober 2026</div>
+          <div style="font-size:11px; color:#94a3b8; margin-top:4px;">Diposting oleh: Pusat Komputer &amp; IT Center &middot; 10 Oktober 2026</div>
         </div>
       </div>
     </div>
@@ -597,55 +527,45 @@ function renderNilaiView(container) {
   const isIDORActive = targetNim !== currentUser.nomor_induk;
 
   container.innerHTML = `
-    <div class="page-header-row">
-      <div class="page-title">
-        <h2>Kartu Hasil Studi (KHS) &amp; Transkrip Akademik</h2>
-        <p>Laporan Capaian Nilai dan Indeks Prestasi Mahasiswa per Semester</p>
-      </div>
-      <div class="academic-period-badge">
-        Semester Ganjil 2026/2027
-      </div>
-    </div>
-
-    <!-- IDOR SIMULATION TOOLBAR -->
-    <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:14px 18px; margin-bottom:20px;">
+    <!-- IDOR SIMULATOR BAR -->
+    <div style="background:#fff1f2; border:1px solid #fecdd3; border-radius:8px; padding:12px 16px; margin-bottom:18px;">
       <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
         <div>
-          <b style="color:#991b1b; font-size:13px;">⚠️ Simulasi Celah IDOR (Insecure Direct Object Reference)</b>
-          <div style="font-size:12px; color:#7f1d1d; margin-top:2px;">
-            Sistem menampilkan transkrip berdasarkan parameter identitas <code>target_nim</code> tanpa memeriksa otorisasi sesi pemilik akun aktif.
+          <b style="color:#9f1239; font-size:12.5px;">⚠️ Simulasi Celah IDOR (Insecure Direct Object Reference)</b>
+          <div style="font-size:11.5px; color:#475569; margin-top:2px;">
+            Sistem menampilkan transkrip berdasarkan parameter <code>target_nim</code> tanpa otentikasi hak milik akun.
           </div>
         </div>
         <div style="display:flex; gap:8px; align-items:center;">
-          <label style="font-size:12px; font-weight:700; color:#334155;">Pilih NIM Mahasiswa:</label>
-          <select id="idorNimSelect" class="gov-input" style="width:auto; padding:5px 10px; font-size:12.5px;" onchange="changeIdorNim(this.value)">
-            <option value="24781078" ${targetNim === "24781078" ? "selected" : ""}>24781078 - Meca (Akun Anda)</option>
+          <label style="font-size:11.5px; font-weight:700; color:#334155;">Target NIM:</label>
+          <select class="form-input-control" style="width:auto; padding:4px 8px; font-size:12px;" onchange="changeIdorNim(this.value)">
+            <option value="24781078" ${targetNim === "24781078" ? "selected" : ""}>24781078 - Meca Abzanro (Milik Anda)</option>
             <option value="24781015" ${targetNim === "24781015" ? "selected" : ""}>24781015 - Siti Nurhaliza (Target IDOR)</option>
             <option value="24781023" ${targetNim === "24781023" ? "selected" : ""}>24781023 - Budi Darmawan (Target IDOR)</option>
           </select>
         </div>
       </div>
       ${isIDORActive ? `
-        <div style="margin-top:10px; background:#dc2626; color:#ffffff; font-size:12px; padding:6px 12px; border-radius:6px; font-weight:700;">
-          🚨 EKSPLOITASI IDOR BERHASIL: Anda (NIM: ${currentUser.nomor_induk}) berhasil mengakses transkrip nilai privat milik: ${userTarget.nama} (NIM: ${targetNim})!
+        <div style="margin-top:8px; background:#e11d48; color:#fff; font-size:11.5px; padding:5px 10px; border-radius:4px; font-weight:700;">
+          🚨 EKSPLOITASI IDOR BERHASIL: Anda (NIM: ${currentUser.nomor_induk}) berhasil membuka KHS rahasia milik: ${userTarget.nama} (NIM: ${targetNim})!
         </div>
       ` : ''}
     </div>
 
-    <!-- IDENTITAS MAHASISWA PADA KHS -->
+    <!-- IDENTITAS MAHASISWA -->
     <div class="academic-card" style="padding:18px;">
-      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:16px;">
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:14px;">
         <div>
           <div style="font-size:11px; color:#64748b; font-weight:700; text-transform:uppercase;">Nama Mahasiswa</div>
-          <div style="font-size:15px; font-weight:800; color:#0f172a;">${escapeHTML(userTarget.nama)}</div>
+          <div style="font-size:15px; font-weight:800; color:#0f2b5c;">${escapeHTML(userTarget.nama)}</div>
         </div>
         <div>
-          <div style="font-size:11px; color:#64748b; font-weight:700; text-transform:uppercase;">Nomor Induk Mahasiswa (NIM)</div>
-          <div style="font-size:14px; font-weight:700; color:#1e3a8a;">${escapeHTML(userTarget.nomor_induk)}</div>
+          <div style="font-size:11px; color:#64748b; font-weight:700; text-transform:uppercase;">Nomor Induk Mahasiswa</div>
+          <div style="font-size:14px; font-weight:700; color:#1e40af;">${escapeHTML(userTarget.nomor_induk)}</div>
         </div>
         <div>
-          <div style="font-size:11px; color:#64748b; font-weight:700; text-transform:uppercase;">Program Studi / Jurusan</div>
-          <div style="font-size:13.5px; font-weight:600; color:#334155;">${escapeHTML(userTarget.prodi || 'Teknologi Informasi')}</div>
+          <div style="font-size:11px; color:#64748b; font-weight:700; text-transform:uppercase;">Program Studi</div>
+          <div style="font-size:13px; font-weight:600; color:#334155;">${escapeHTML(userTarget.prodi || 'D3 Manajemen Informatika')}</div>
         </div>
         <div>
           <div style="font-size:11px; color:#64748b; font-weight:700; text-transform:uppercase;">Indeks Prestasi Semester (IPS)</div>
@@ -654,15 +574,17 @@ function renderNilaiView(container) {
       </div>
     </div>
 
-    <!-- TABEL KHS RESMI -->
+    <!-- TABEL KHS -->
     <div class="academic-card">
-      <div class="card-header-styled">
-        <h3>Daftar Nilai Hasil Studi</h3>
-        <button class="btn-gov btn-gov-secondary btn-gov-sm" onclick="window.print()">🖨️ Cetak KHS Resmi</button>
+      <div class="card-header-line">
+        <div class="card-title-text">
+          <span>📊</span> <span>Kartu Hasil Studi (KHS) Semester Ganjil 2026/2027</span>
+        </div>
+        <button class="btn-siakad btn-secondary btn-sm" onclick="window.print()">🖨️ Cetak KHS PDF</button>
       </div>
 
-      <div class="table-container">
-        <table class="academic-table">
+      <div class="table-responsive-box">
+        <table class="siakad-table">
           <thead>
             <tr>
               <th>No</th>
@@ -686,7 +608,7 @@ function renderNilaiView(container) {
                 <td>${g.tugas}</td>
                 <td>${g.uts}</td>
                 <td>${g.uas}</td>
-                <td><span class="grade-box grade-${g.huruf.charAt(0)}">${g.huruf}</span></td>
+                <td><span class="grade-badge-cell badge-${g.huruf.charAt(0)}">${g.huruf}</span></td>
                 <td><b>${g.bobot.toFixed(2)}</b></td>
               </tr>
             `).join("")}
@@ -705,7 +627,7 @@ function changeIdorNim(newNim) {
   const url = new URL(window.location);
   url.searchParams.set("nim", newNim);
   window.history.pushState({}, "", url);
-  renderNilaiView(document.getElementById("portalMainContent"));
+  renderNilaiView(document.getElementById("siakadMainContent"));
 }
 
 // ==========================================
@@ -716,75 +638,69 @@ function renderTugasView(container) {
   const mySubmissions = submissions.filter(s => s.nim === currentUser.nomor_induk);
 
   container.innerHTML = `
-    <div class="page-header-row">
-      <div class="page-title">
-        <h2>E-Learning &amp; Pengumpulan Tugas Perkuliahan</h2>
-        <p>Layanan Pengunggahan Berkas Portofolio dan Tugas Mahasiswa Terpadu</p>
-      </div>
-      <div class="academic-period-badge">
-        Portal Mahasiswa
+    <!-- UNRESTRICTED UPLOAD BAR -->
+    <div style="background:#fff1f2; border:1px solid #fecdd3; border-radius:8px; padding:12px 16px; margin-bottom:18px;">
+      <b style="color:#9f1239; font-size:12.5px;">⚠️ Celah Keamanan: Validasi Ekstensi &amp; MIME Berkas Lemah (Unrestricted Upload)</b>
+      <div style="font-size:11.5px; color:#475569; margin-top:2px;">
+        Sistem tidak memeriksa ekstensi file yang diunggah. Berkas web (.html, .svg, .js) berisi script jahat dapat diunggah dan dieksekusi saat dibuka.
       </div>
     </div>
 
-    <!-- KERENTANAN UNRESTRICTED FILE UPLOAD -->
-    <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:12px 16px; margin-bottom:20px; font-size:12.5px;">
-      <b style="color:#991b1b;">⚠️ Celah Keamanan: Validasi Ekstensi &amp; MIME Berkas Lemah (Unrestricted Upload)</b>
-      <div style="color:#7f1d1d; margin-top:2px;">
-        Sistem tidak memeriksa tipe berkas atau ekstensi file yang diunggah. Mahasiswa dapat mengunggah berkas web eksekutabel (seperti <code>.html</code>, <code>.svg</code>) berisi script jahat yang akan tereksekusi langsung di origin domain saat dibuka.
-      </div>
-    </div>
-
-    <!-- FORM PENGUMPULAN TUGAS -->
+    <!-- FORM UPLOAD -->
     <div class="academic-card">
-      <div class="card-header-styled">
-        <h3>📤 Formulir Pengunggahan Berkas Tugas Kuliah</h3>
+      <div class="card-header-line">
+        <div class="card-title-text">
+          <span>📤</span> <span>Pengumpulan Berkas Tugas Mahasiswa</span>
+        </div>
       </div>
 
       <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
-        <div class="gov-form-group">
+        <div class="form-field-row">
           <label>Mata Kuliah:</label>
-          <select id="uploadMatkul" class="gov-input">
+          <select id="uploadMatkul" class="form-input-control">
             <option value="Keamanan Sistem Informasi & Siber">Keamanan Sistem Informasi & Siber</option>
             <option value="Pemrograman Web Lanjut & API">Pemrograman Web Lanjut & API</option>
             <option value="Manajemen Basis Data & SQL">Manajemen Basis Data & SQL</option>
           </select>
         </div>
-        <div class="gov-form-group">
+        <div class="form-field-row">
           <label>Judul / Catatan Tugas:</label>
-          <input type="text" id="uploadJudul" class="gov-input" placeholder="Contoh: Tugas 1 - Laporan Analisis Kerentanan">
+          <input type="text" id="uploadJudul" class="form-input-control" placeholder="Contoh: Laporan Praktikum Evaluasi OWASP">
         </div>
       </div>
 
-      <div class="gov-form-group">
-        <label>Pilih Berkas Tugas (Menerima Format Apapun Tanpa Filter):</label>
-        <input type="file" id="uploadFile" class="gov-input" style="padding:6px 10px;">
+      <div class="form-field-row">
+        <label>Pilih Berkas Tugas (Menerima Ekstensi Apa Saja):</label>
+        <input type="file" id="uploadFile" class="form-input-control" style="padding:6px 10px;">
       </div>
 
-      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-top:16px;">
-        <button class="btn-gov btn-gov-primary" onclick="submitTugasFile()">
-          🚀 Unggah Berkas ke E-Learning
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-top:14px;">
+        <button class="btn-siakad btn-primary" onclick="submitTugasFile()">
+          🚀 Unggah Berkas Tugas
         </button>
-        <button class="btn-gov btn-gov-secondary btn-gov-sm" onclick="simulateMaliciousUpload()">
+        <button class="btn-siakad btn-secondary btn-sm" onclick="simulateMaliciousUpload()">
           ⚡ Uji Upload File Berbahaya (.html XSS)
         </button>
       </div>
     </div>
 
-    <!-- TABEL RIWAYAT PENGUMPULAN TUGAS -->
+    <!-- DAFTAR PENGUMPULAN TUGAS -->
     <div class="academic-card">
-      <div class="card-header-styled">
-        <h3>Daftar Berkas Tugas yang Sudah Terunggah</h3>
+      <div class="card-header-line">
+        <div class="card-title-text">
+          <span>📂</span> <span>Riwayat Pengumpulan Berkas Tugas</span>
+        </div>
       </div>
 
-      <div class="table-container">
-        <table class="academic-table">
+      <div class="table-responsive-box">
+        <table class="siakad-table">
           <thead>
             <tr>
               <th>Mata Kuliah</th>
               <th>Judul Tugas</th>
               <th>Nama Berkas</th>
               <th>Waktu Unggah</th>
-              <th>Status Penilaian</th>
+              <th>Status</th>
               <th>Aksi Berkas</th>
             </tr>
           </thead>
@@ -795,9 +711,9 @@ function renderTugasView(container) {
                 <td>${escapeHTML(s.judul)}</td>
                 <td><code style="color:#2563eb; font-weight:700;">${escapeHTML(s.nama_file)}</code></td>
                 <td>${s.waktu}</td>
-                <td><span class="status-pill pill-success">${s.status} (${s.nilai || 'Menunggu'})</span></td>
+                <td><span style="background:#ecfdf5; color:#059669; font-weight:700; padding:2px 8px; border-radius:4px; font-size:11px;">${s.status} (${s.nilai || 'Menunggu'})</span></td>
                 <td>
-                  <button class="btn-gov btn-gov-secondary btn-gov-sm" onclick="previewUploadedFile(${s.id})">
+                  <button class="btn-siakad btn-secondary btn-sm" onclick="previewUploadedFile(${s.id})">
                     👁️ Buka / Jalankan File
                   </button>
                 </td>
@@ -830,7 +746,7 @@ function submitTugasFile() {
 }
 
 function simulateMaliciousUpload() {
-  const maliciousHTML = `<!DOCTYPE html><html><body><h1 style="color:red">⚠️ Malicious Script Executed via Unrestricted Upload!</h1><p>Berkas HTML ini dieksekusi di domain kampus tanpa filter.</p><script>alert('🔴 [UNRESTRICTED UPLOAD BERHASIL]\\nFile .html dieksekusi di origin!\\nSession: ' + localStorage.getItem('itsm_siakad_v3'));</script></body></html>`;
+  const maliciousHTML = `<!DOCTYPE html><html><body><h1 style="color:red">⚠️ Malicious Script Executed via Unrestricted Upload!</h1><p>Berkas HTML ini dieksekusi di domain kampus tanpa filter.</p><script>alert('🔴 [UNRESTRICTED UPLOAD BERHASIL]\\nFile .html dieksekusi di origin!\\nSession: ' + localStorage.getItem('itsm_db_v4_siakad'));</script></body></html>`;
   saveSubmission("Keamanan Sistem Informasi & Siber", "PoC Exploit - File Upload RCE/XSS", "payload_backdoor.html", "text/html", maliciousHTML);
 }
 
@@ -861,7 +777,7 @@ function saveSubmission(matkul, judul, filename, mime, content) {
     showToast("Berkas tugas berhasil dikirimkan ke dosen.");
   }
 
-  renderTugasView(document.getElementById("portalMainContent"));
+  renderTugasView(document.getElementById("siakadMainContent"));
 }
 
 function previewUploadedFile(subId) {
@@ -881,64 +797,56 @@ function renderForumView(container) {
   const threads = getStorage("itsm_threads", DEFAULT_THREADS);
 
   container.innerHTML = `
-    <div class="page-header-row">
-      <div class="page-title">
-        <h2>Forum Diskusi Akademik Terbuka</h2>
-        <p>Ruang Komunikasi Interaktif Dosen dan Mahasiswa ITSM</p>
-      </div>
-      <div class="academic-period-badge">
-        Forum Kelas Terbuka
-      </div>
-    </div>
-
-    <!-- KERENTANAN STORED XSS -->
-    <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:12px 16px; margin-bottom:20px; font-size:12.5px;">
-      <b style="color:#991b1b;">⚠️ Celah Keamanan: Stored XSS (Cross-Site Scripting)</b>
-      <div style="color:#7f1d1d; margin-top:2px;">
-        Komentar forum disimpan apa adanya di basis data dan dirender langsung ke DOM melalui <code>innerHTML</code> tanpa enkoding HTML.
+    <!-- STORED XSS BAR -->
+    <div style="background:#fff1f2; border:1px solid #fecdd3; border-radius:8px; padding:12px 16px; margin-bottom:18px;">
+      <b style="color:#9f1239; font-size:12.5px;">⚠️ Celah Keamanan: Stored XSS (Cross-Site Scripting)</b>
+      <div style="font-size:11.5px; color:#475569; margin-top:2px;">
+        Komentar forum disimpan apa adanya di database dan dirender langsung ke DOM melalui <code>innerHTML</code> tanpa sanitasi.
       </div>
     </div>
 
     <!-- DAFTAR THREAD FORUM -->
     <div class="academic-card">
-      <div class="card-header-styled">
-        <h3>Daftar Topik Perkuliahan Aktif</h3>
+      <div class="card-header-line">
+        <div class="card-title-text">
+          <span>💬</span> <span>Forum Diskusi Kelas Perkuliahan</span>
+        </div>
       </div>
 
       <div style="display:flex; flex-direction:column; gap:16px;">
         ${threads.map(th => `
-          <div class="forum-card-thread">
-            <div class="forum-author-row">
-              <div class="avatar-img" style="width:34px; height:34px; font-size:12px;">${th.author.charAt(0)}</div>
+          <div style="border:1px solid #e2e8f0; border-radius:8px; padding:16px; background:#ffffff;">
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+              <div class="user-avatar-circle" style="width:32px; height:32px; font-size:12px;">${th.author.charAt(0)}</div>
               <div>
-                <b style="color:#0f172a; font-size:13.5px;">${escapeHTML(th.author)}</b>
-                <span class="status-pill ${th.role === 'dosen' ? 'pill-info' : 'pill-success'}" style="font-size:9.5px; margin-left:6px;">${th.role.toUpperCase()}</span>
-                <div style="font-size:11px; color:#64748b;">${escapeHTML(th.matkul)} · ${th.time}</div>
+                <b style="color:#0f2b5c; font-size:13px;">${escapeHTML(th.author)}</b>
+                <span style="background:#eff6ff; color:#1d4ed8; font-weight:700; padding:1px 6px; border-radius:4px; font-size:10px; margin-left:6px;">${th.role.toUpperCase()}</span>
+                <div style="font-size:11px; color:#64748b;">${escapeHTML(th.matkul)} &middot; ${th.time}</div>
               </div>
             </div>
 
-            <h4 style="font-size:15px; color:#1e3a8a; margin-bottom:6px;">${escapeHTML(th.title)}</h4>
-            <p style="font-size:13px; color:#334155; line-height:1.6;">${escapeHTML(th.content)}</p>
+            <h4 style="font-size:14px; color:#1e40af; margin-bottom:6px;">${escapeHTML(th.title)}</h4>
+            <p style="font-size:12.5px; color:#334155; line-height:1.6;">${escapeHTML(th.content)}</p>
 
-            <!-- TANGGAPAN / KOMENTAR: TEMPAT STORED XSS DIEKSEKUSI -->
-            <div class="comment-box-gray">
-              <b style="font-size:12px; color:#1e3a8a; display:block; margin-bottom:6px;">Tanggapan Forum (${th.comments.length}):</b>
+            <!-- KOMENTAR: STORED XSS -->
+            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:12px; margin-top:12px;">
+              <b style="font-size:11.5px; color:#1e40af; display:block; margin-bottom:6px;">Tanggapan Forum (${th.comments.length}):</b>
               
-              <div style="display:flex; flex-direction:column; gap:8px;">
+              <div style="display:flex; flex-direction:column; gap:6px;">
                 ${th.comments.map(c => `
-                  <div style="padding:6px 0; border-bottom:1px solid #e2e8f0; font-size:12.5px;">
+                  <div style="padding:6px 0; border-bottom:1px solid #e2e8f0; font-size:12px;">
                     <b>${escapeHTML(c.author)}</b> <span style="font-size:10.5px; color:#94a3b8;">(${c.time}):</span>
-                    <!-- KERENTANAN SENGANJA: teks komentar dirender via innerHTML tanpa escape -->
+                    <!-- RENDER LANGSUNG INNERHTML (STORED XSS) -->
                     <div style="margin-top:2px; color:#1e293b;">${c.text}</div>
                   </div>
                 `).join("")}
               </div>
 
               <!-- INPUT BALAS KOMENTAR -->
-              <div style="margin-top:12px; display:flex; gap:8px;">
-                <input type="text" id="reply-input-${th.id}" class="gov-input" placeholder="Tuliskan tanggapan Anda... (Coba masukkan script XSS)" style="font-size:12.5px; padding:7px 12px;">
-                <button class="btn-gov btn-gov-primary btn-gov-sm" onclick="submitComment(${th.id})">Kirim</button>
-                <button class="btn-gov btn-gov-secondary btn-gov-sm" onclick="fillXSSPayload(${th.id})" title="Isi otomatis skrip XSS">⚡ Inject XSS</button>
+              <div style="margin-top:10px; display:flex; gap:8px;">
+                <input type="text" id="reply-input-${th.id}" class="form-input-control" placeholder="Tuliskan tanggapan Anda... (Coba masukkan script XSS)" style="font-size:12px; padding:6px 10px;">
+                <button class="btn-siakad btn-primary btn-sm" onclick="submitComment(${th.id})">Kirim</button>
+                <button class="btn-siakad btn-secondary btn-sm" onclick="fillXSSPayload(${th.id})" title="Isi otomatis skrip XSS">⚡ Inject XSS</button>
               </div>
             </div>
           </div>
@@ -959,7 +867,7 @@ function submitComment(threadId) {
     target.comments.push({
       author: currentUser.nama,
       role: currentUser.role,
-      text: text, // DISIMPAN APA ADANYA
+      text: text,
       time: "Baru saja"
     });
     setStorage("itsm_threads", threads);
@@ -971,13 +879,13 @@ function submitComment(threadId) {
       showToast("Tanggapan berhasil diposting.");
     }
 
-    renderForumView(document.getElementById("portalMainContent"));
+    renderForumView(document.getElementById("siakadMainContent"));
   }
 }
 
 function fillXSSPayload(threadId) {
   const input = document.getElementById(`reply-input-${threadId}`);
-  input.value = `<img src=x onerror="alert('🔴 [STORED XSS BERHASIL]\\nCookie/Token Terbaca: ' + localStorage.getItem('itsm_siakad_v3') + '\\nPengguna: ${currentUser.nama}')">`;
+  input.value = `<img src=x onerror="alert('🔴 [STORED XSS BERHASIL]\\nCookie/Token Terbaca: ' + localStorage.getItem('itsm_db_v4_siakad') + '\\nPengguna: ${currentUser.nama}')">`;
   input.focus();
 }
 
@@ -986,56 +894,48 @@ function fillXSSPayload(threadId) {
 // ==========================================
 function renderProfilView(container) {
   container.innerHTML = `
-    <div class="page-header-row">
-      <div class="page-title">
-        <h2>Biodata &amp; Pengaturan Profil Akun</h2>
-        <p>Informasi Data Pokok Mahasiswa Terpadu (PDDIKTI)</p>
-      </div>
-      <div class="academic-period-badge">
-        Role: <b style="text-transform:uppercase;">${currentUser.role}</b>
-      </div>
-    </div>
-
-    <!-- KERENTANAN PRIVILEGE ESCALATION -->
-    <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:12px 16px; margin-bottom:20px; font-size:12.5px;">
-      <b style="color:#991b1b;">⚠️ Celah Keamanan: Eskalasi Hak Akses (Privilege Escalation / Mass Assignment)</b>
-      <div style="color:#7f1d1d; margin-top:2px;">
+    <!-- ESKALASI ROLE BAR -->
+    <div style="background:#fff1f2; border:1px solid #fecdd3; border-radius:8px; padding:12px 16px; margin-bottom:18px;">
+      <b style="color:#9f1239; font-size:12.5px;">⚠️ Celah Keamanan: Eskalasi Hak Akses (Privilege Escalation / Mass Assignment)</b>
+      <div style="font-size:11.5px; color:#475569; margin-top:2px;">
         Parameter <code>role</code> pada formulir pembaruan profil dikirim dari browser tanpa validasi otorisasi di backend. Mahasiswa dapat menaikkan hak akses dirinya menjadi <b>Dosen</b> atau <b>Admin</b>.
       </div>
     </div>
 
     <!-- FORM BIODATA -->
     <div class="academic-card">
-      <div class="card-header-styled">
-        <h3>Identitas Pokok Civitas Akademika</h3>
+      <div class="card-header-line">
+        <div class="card-title-text">
+          <span>👤</span> <span>Biodata Civitas Akademika (PDDIKTI)</span>
+        </div>
       </div>
 
       <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
-        <div class="gov-form-group">
+        <div class="form-field-row">
           <label>Nama Lengkap:</label>
-          <input type="text" id="profNama" class="gov-input" value="${escapeHTML(currentUser.nama)}">
+          <input type="text" id="profNama" class="form-input-control" value="${escapeHTML(currentUser.nama)}">
         </div>
-        <div class="gov-form-group">
-          <label>NIM / Identitas Pegawai:</label>
-          <input type="text" class="gov-input" value="${escapeHTML(currentUser.nomor_induk)}" disabled style="background:#f1f5f9;">
+        <div class="form-field-row">
+          <label>Nomor Induk Mahasiswa / Pegawai:</label>
+          <input type="text" class="form-input-control" value="${escapeHTML(currentUser.nomor_induk)}" disabled style="background:#f1f5f9;">
         </div>
-        <div class="gov-form-group">
+        <div class="form-field-row">
           <label>Program Studi:</label>
-          <input type="text" class="gov-input" value="${escapeHTML(currentUser.prodi || '')}" disabled style="background:#f1f5f9;">
+          <input type="text" class="form-input-control" value="${escapeHTML(currentUser.prodi || '')}" disabled style="background:#f1f5f9;">
         </div>
-        <div class="gov-form-group">
+        <div class="form-field-row">
           <label>Alamat Email Kampus:</label>
-          <input type="email" id="profEmail" class="gov-input" value="${escapeHTML(currentUser.email || '')}">
+          <input type="email" id="profEmail" class="form-input-control" value="${escapeHTML(currentUser.email || '')}">
         </div>
       </div>
 
       <!-- VULNERABLE ROLE SELECTOR -->
-      <div class="gov-form-group" style="background:#fff1f2; padding:14px; border:1px dashed #f43f5e; border-radius:6px; margin-top:8px;">
+      <div class="form-field-row" style="background:#fff1f2; padding:12px; border:1px dashed #f43f5e; border-radius:6px; margin-top:8px;">
         <label style="color:#be123c; font-weight:800;">Hak Akses / Peran Sistem (Celah Mass Assignment):</label>
-        <p style="font-size:11.5px; color:#475569; margin-bottom:8px;">
+        <p style="font-size:11px; color:#475569; margin-bottom:8px;">
           Pilih role baru untuk mengeskalasi akses akun Anda ke dashboard Dosen atau Administrator:
         </p>
-        <select id="profRole" class="gov-input" style="border-color:#f43f5e; font-weight:700;">
+        <select id="profRole" class="form-input-control" style="border-color:#f43f5e; font-weight:700;">
           <option value="mahasiswa" ${currentUser.role === "mahasiswa" ? "selected" : ""}>Mahasiswa (Akses Standar)</option>
           <option value="dosen" ${currentUser.role === "dosen" ? "selected" : ""}>Dosen (Hak Input Nilai & Review Tugas)</option>
           <option value="admin" ${currentUser.role === "admin" ? "selected" : ""}>Admin IT Center (Hak Penuh Kelola Akun & Pengguna)</option>
@@ -1043,10 +943,10 @@ function renderProfilView(container) {
       </div>
 
       <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-top:16px;">
-        <button class="btn-gov btn-gov-primary" onclick="saveProfileChanges()">
+        <button class="btn-siakad btn-primary" onclick="saveProfileChanges()">
           💾 Simpan Perubahan Biodata
         </button>
-        <button class="btn-gov btn-gov-danger btn-gov-sm" onclick="escalateToAdminQuick()">
+        <button class="btn-siakad btn-danger btn-sm" onclick="escalateToAdminQuick()">
           ⚡ Eskalasi Cepat ke Super Admin
         </button>
       </div>
@@ -1074,14 +974,14 @@ function saveProfileChanges() {
 
     if (oldRole !== newRole) {
       logActivity("⚠️ ESKALASI ROLE BERHASIL", `User ${currentUser.username} mengubah role menjadi ${newRole}`);
-      showToast(`🚨 <b>Eskalasi Role Berhasil!</b> Akun Anda dinaikkan menjadi <b>${newRole.toUpperCase()}</b>. Menu baru terbuka di sidebar!`, true);
+      showToast(`🚨 <b>Eskalasi Role Berhasil!</b> Akun Anda dinaikkan menjadi <b>${newRole.toUpperCase()}</b>. Menu baru terbuka di navbar!`, true);
     } else {
       showToast("Biodata profil berhasil disimpan.");
     }
 
-    renderHeaderUser();
-    updateSidebarMenu();
-    renderProfilView(document.getElementById("portalMainContent"));
+    updateHeaderProfile();
+    updateNavRoleTabs();
+    renderProfilView(document.getElementById("siakadMainContent"));
   }
 }
 
@@ -1092,30 +992,22 @@ function escalateToAdminQuick() {
 }
 
 // ==========================================
-// 6. PANEL DOSEN: INPUT NILAI MAHASISWA
+// 6. PANEL DOSEN
 // ==========================================
 function renderGradingView(container) {
   const grades = getStorage("itsm_grades", DEFAULT_GRADES);
   const users = getStorage("itsm_users", DEFAULT_USERS);
 
   container.innerHTML = `
-    <div class="page-header-row">
-      <div class="page-title">
-        <h2>Panel Dosen: Evaluasi &amp; Input Nilai KHS</h2>
-        <p>Wewenang Dosen Pengampu untuk Memasukkan Komponen Nilai Tugas, UTS, dan UAS</p>
-      </div>
-      <div class="academic-period-badge">
-        Dosen Pengampu
-      </div>
-    </div>
-
     <div class="academic-card">
-      <div class="card-header-styled">
-        <h3>Daftar Mahasiswa yang Mengambil Mata Kuliah Anda</h3>
+      <div class="card-header-line">
+        <div class="card-title-text">
+          <span>📝</span> <span>Panel Dosen: Input Nilai KHS Mahasiswa</span>
+        </div>
       </div>
 
-      <div class="table-container">
-        <table class="academic-table">
+      <div class="table-responsive-box">
+        <table class="siakad-table">
           <thead>
             <tr>
               <th>NIM</th>
@@ -1136,11 +1028,11 @@ function renderGradingView(container) {
                   <td><code>${g.nim}</code></td>
                   <td><b>${mhs ? escapeHTML(mhs.nama) : 'Mahasiswa'}</b></td>
                   <td>${g.matkul}</td>
-                  <td><input type="number" id="tugas-${idx}" class="gov-input" value="${g.tugas}" style="width:70px; padding:4px 6px;"></td>
-                  <td><input type="number" id="uts-${idx}" class="gov-input" value="${g.uts}" style="width:70px; padding:4px 6px;"></td>
-                  <td><input type="number" id="uas-${idx}" class="gov-input" value="${g.uas}" style="width:70px; padding:4px 6px;"></td>
+                  <td><input type="number" id="tugas-${idx}" class="form-input-control" value="${g.tugas}" style="width:70px; padding:3px 6px;"></td>
+                  <td><input type="number" id="uts-${idx}" class="form-input-control" value="${g.uts}" style="width:70px; padding:3px 6px;"></td>
+                  <td><input type="number" id="uas-${idx}" class="form-input-control" value="${g.uas}" style="width:70px; padding:3px 6px;"></td>
                   <td>
-                    <select id="huruf-${idx}" class="gov-input" style="width:75px; padding:4px;">
+                    <select id="huruf-${idx}" class="form-input-control" style="width:75px; padding:3px;">
                       <option value="A" ${g.huruf === 'A' ? 'selected' : ''}>A</option>
                       <option value="A-" ${g.huruf === 'A-' ? 'selected' : ''}>A-</option>
                       <option value="B+" ${g.huruf === 'B+' ? 'selected' : ''}>B+</option>
@@ -1152,7 +1044,7 @@ function renderGradingView(container) {
                     </select>
                   </td>
                   <td>
-                    <button class="btn-gov btn-gov-primary btn-gov-sm" onclick="saveGrade(${idx})">💾 Simpan</button>
+                    <button class="btn-siakad btn-primary btn-sm" onclick="saveGrade(${idx})">💾 Simpan</button>
                   </td>
                 </tr>
               `;
@@ -1188,16 +1080,15 @@ function renderReviewTugasView(container) {
   const subs = getStorage("itsm_submissions", DEFAULT_SUBMISSIONS);
 
   container.innerHTML = `
-    <div class="page-header-row">
-      <div class="page-title">
-        <h2>Panel Dosen: Review Berkas Pengumpulan Tugas</h2>
-        <p>Memeriksa dan Membuka Dokumen Tugas yang Dikirimkan Mahasiswa</p>
-      </div>
-    </div>
-
     <div class="academic-card">
-      <div class="table-container">
-        <table class="academic-table">
+      <div class="card-header-line">
+        <div class="card-title-text">
+          <span>📂</span> <span>Panel Dosen: Review Berkas Tugas Mahasiswa</span>
+        </div>
+      </div>
+
+      <div class="table-responsive-box">
+        <table class="siakad-table">
           <thead>
             <tr>
               <th>Nama Mahasiswa</th>
@@ -1217,7 +1108,7 @@ function renderReviewTugasView(container) {
                 <td><code style="color:#2563eb;">${escapeHTML(s.nama_file)}</code></td>
                 <td>${s.waktu}</td>
                 <td>
-                  <button class="btn-gov btn-gov-secondary btn-gov-sm" onclick="previewUploadedFile(${s.id})">👁️ Buka File</button>
+                  <button class="btn-siakad btn-secondary btn-sm" onclick="previewUploadedFile(${s.id})">👁️ Buka File</button>
                 </td>
               </tr>
             `).join("")}
@@ -1229,23 +1120,22 @@ function renderReviewTugasView(container) {
 }
 
 // ==========================================
-// 7. PANEL ADMIN: KELOLA PENGGUNA & AUDIT
+// 7. PANEL ADMIN
 // ==========================================
 function renderAdminUsersView(container) {
   const users = getStorage("itsm_users", DEFAULT_USERS);
 
   container.innerHTML = `
-    <div class="page-header-row">
-      <div class="page-title">
-        <h2>Panel Administrator: Manajemen Akun Civitas Akademika</h2>
-        <p>Pengelolaan Pengguna Sistem Informasi Akademik ITSM</p>
-      </div>
-      <button class="btn-gov btn-gov-primary btn-gov-sm" onclick="openCreateUserModal()">+ Tambah Pengguna Baru</button>
-    </div>
-
     <div class="academic-card">
-      <div class="table-container">
-        <table class="academic-table">
+      <div class="card-header-line">
+        <div class="card-title-text">
+          <span>👥</span> <span>Panel Admin: Manajemen Akun Civitas Akademika</span>
+        </div>
+        <button class="btn-siakad btn-primary btn-sm" onclick="openCreateUserModal()">+ Tambah Pengguna Baru</button>
+      </div>
+
+      <div class="table-responsive-box">
+        <table class="siakad-table">
           <thead>
             <tr>
               <th>Username</th>
@@ -1262,12 +1152,12 @@ function renderAdminUsersView(container) {
                 <td><code>${escapeHTML(u.username)}</code></td>
                 <td><b>${escapeHTML(u.nama)}</b></td>
                 <td>${escapeHTML(u.nomor_induk)}</td>
-                <td><span class="status-pill pill-info">${u.role.toUpperCase()}</span></td>
+                <td><span style="background:#eff6ff; color:#1e40af; font-weight:700; padding:2px 6px; border-radius:4px; font-size:10.5px;">${u.role.toUpperCase()}</span></td>
                 <td><span style="color:#059669; font-weight:700;">${escapeHTML(u.status || 'Aktif')}</span></td>
                 <td>
-                  <button class="btn-gov btn-gov-secondary btn-gov-sm" onclick="quickLogin('${u.username}')">🔑 Login Sebagai</button>
+                  <button class="btn-siakad btn-secondary btn-sm" onclick="quickLogin('${u.username}')">🔑 Login</button>
                   ${u.username !== 'admin_itsm' ? `
-                    <button class="btn-gov btn-gov-danger btn-gov-sm" onclick="deleteUser(${u.id})">🗑️ Hapus</button>
+                    <button class="btn-siakad btn-danger btn-sm" onclick="deleteUser(${u.id})">🗑️ Hapus</button>
                   ` : ''}
                 </td>
               </tr>
@@ -1285,7 +1175,7 @@ function deleteUser(userId) {
   users = users.filter(u => u.id !== userId);
   setStorage("itsm_users", users);
   showToast("Akun pengguna berhasil dihapus.");
-  renderAdminUsersView(document.getElementById("portalMainContent"));
+  renderAdminUsersView(document.getElementById("siakadMainContent"));
 }
 
 function openCreateUserModal() {
@@ -1309,24 +1199,23 @@ function openCreateUserModal() {
   });
   setStorage("itsm_users", users);
   showToast(`Akun baru <b>${nama}</b> berhasil didaftarkan!`);
-  renderAdminUsersView(document.getElementById("portalMainContent"));
+  renderAdminUsersView(document.getElementById("siakadMainContent"));
 }
 
 function renderAuditLogsView(container) {
   const logs = getStorage("itsm_logs", []);
 
   container.innerHTML = `
-    <div class="page-header-row">
-      <div class="page-title">
-        <h2>Panel Administrator: Audit Log &amp; Rekam Jejak Keamanan</h2>
-        <p>Pencatatan Aktivitas Autentikasi dan Potensi Insiden Keamanan Sistem</p>
-      </div>
-      <button class="btn-gov btn-gov-secondary btn-gov-sm" onclick="clearLogs()">Bersihkan Log</button>
-    </div>
-
     <div class="academic-card">
-      <div class="table-container">
-        <table class="academic-table">
+      <div class="card-header-line">
+        <div class="card-title-text">
+          <span>🛡️</span> <span>Panel Admin: Audit Log &amp; Rekam Jejak Keamanan</span>
+        </div>
+        <button class="btn-siakad btn-secondary btn-sm" onclick="clearLogs()">Bersihkan Log</button>
+      </div>
+
+      <div class="table-responsive-box">
+        <table class="siakad-table">
           <thead>
             <tr>
               <th>Waktu</th>
@@ -1341,7 +1230,7 @@ function renderAuditLogsView(container) {
                 <td style="font-family:var(--font-mono); font-size:11.5px;">${l.time}</td>
                 <td><b>${escapeHTML(l.user)}</b></td>
                 <td><span style="color:${l.action.includes('⚠️') ? '#dc2626' : '#2563eb'}; font-weight:700;">${escapeHTML(l.action)}</span></td>
-                <td style="font-family:var(--font-mono); font-size:12px; color:#475569;">${escapeHTML(l.details || '-')}</td>
+                <td style="font-family:var(--font-mono); font-size:11.5px; color:#475569;">${escapeHTML(l.details || '-')}</td>
               </tr>
             `).join("")}
           </tbody>
@@ -1353,27 +1242,13 @@ function renderAuditLogsView(container) {
 
 function clearLogs() {
   setStorage("itsm_logs", []);
-  renderAuditLogsView(document.getElementById("portalMainContent"));
+  renderAuditLogsView(document.getElementById("siakadMainContent"));
   showToast("Audit log berhasil dibersihkan.");
 }
 
-// Modal PoC
 function toggleSecurityModal(show) {
   const modal = document.getElementById("securityModalOverlay");
   if (modal) modal.style.display = show ? "flex" : "none";
-}
-
-// Event Setup
-function setupEvents() {
-  const loginForm = document.getElementById("loginForm");
-  if (loginForm) {
-    loginForm.addEventListener("submit", (e) => {
-      e.preventDefault();
-      const u = document.getElementById("loginUsername").value.trim();
-      const p = document.getElementById("loginPassword").value.trim();
-      login(u, p);
-    });
-  }
 }
 
 function escapeHTML(str) {

@@ -221,9 +221,12 @@ if (!localStorage.getItem(DB_VERSION)) {
   ]);
 }
 
-// Selalu pastikan user aktif (Default: Meca - 24781078)
+// Cek apakah pengguna sebelumnya melakukan logout
+let isLoggedOut = localStorage.getItem("itsm_logged_out") === "true";
 let currentUser = getStorage("itsm_current_user", null);
-if (!currentUser) {
+
+if (!isLoggedOut && !currentUser) {
+  // Default login pertama kali sebagai Meca agar dashboard langsung tampil
   currentUser = { ...DEFAULT_USERS[0] };
   setStorage("itsm_current_user", currentUser);
 }
@@ -232,9 +235,11 @@ let currentPage = "beranda";
 
 document.addEventListener("DOMContentLoaded", () => {
   startClock();
-  updateHeaderProfile();
-  updateNavRoleTabs();
-  navTo("beranda");
+  if (currentUser) {
+    renderDashboardScreen();
+  } else {
+    renderAuthScreen();
+  }
 });
 
 function startClock() {
@@ -274,7 +279,52 @@ function logActivity(action, details = "") {
   setStorage("itsm_logs", logs.slice(0, 50));
 }
 
+// TAMPILKAN LAYAR LOGIN SSO
+function renderAuthScreen() {
+  const authSec = document.getElementById("authSection");
+  const portalView = document.getElementById("portalViewport");
+  const navTabs = document.querySelector(".portal-navbar-tabs");
+  const switcher = document.querySelector(".role-switcher-card");
+  const profileWidget = document.getElementById("headerProfileWidget");
+  const btnLogout = document.querySelector("button[onclick='logout()']");
+
+  if (authSec) authSec.style.display = "flex";
+  if (portalView) portalView.style.display = "none";
+  if (navTabs) navTabs.style.display = "none";
+  if (switcher) switcher.style.display = "none";
+  if (profileWidget) profileWidget.style.display = "none";
+  if (btnLogout) {
+    btnLogout.innerText = "Masuk";
+    btnLogout.onclick = () => renderAuthScreen();
+  }
+}
+
+// TAMPILKAN LAYAR DASHBOARD UTAMA
+function renderDashboardScreen() {
+  const authSec = document.getElementById("authSection");
+  const portalView = document.getElementById("portalViewport");
+  const navTabs = document.querySelector(".portal-navbar-tabs");
+  const switcher = document.querySelector(".role-switcher-card");
+  const profileWidget = document.getElementById("headerProfileWidget");
+  const btnLogout = document.querySelector("button[onclick='logout()'], button[onclick='renderAuthScreen()']");
+
+  if (authSec) authSec.style.display = "none";
+  if (portalView) portalView.style.display = "block";
+  if (navTabs) navTabs.style.display = "block";
+  if (switcher) switcher.style.display = "flex";
+  if (profileWidget) profileWidget.style.display = "flex";
+  if (btnLogout) {
+    btnLogout.innerText = "Keluar";
+    btnLogout.onclick = () => logout();
+  }
+
+  updateHeaderProfile();
+  updateNavRoleTabs();
+  navTo(currentPage || "beranda");
+}
+
 function updateHeaderProfile() {
+  if (!currentUser) return;
   const avatarElem = document.getElementById("headerAvatarText");
   const nameElem = document.getElementById("headerUserName");
   const subElem = document.getElementById("headerUserSub");
@@ -287,6 +337,7 @@ function updateHeaderProfile() {
 }
 
 function updateNavRoleTabs() {
+  if (!currentUser) return;
   const tabGrading = document.getElementById("tab-grading");
   const tabReview = document.getElementById("tab-review_tugas");
   const tabAdminUsers = document.getElementById("tab-admin_users");
@@ -301,26 +352,69 @@ function updateNavRoleTabs() {
   if (tabAuditLogs) tabAuditLogs.style.display = isAdmin ? "flex" : "none";
 }
 
+// FUNGSI SUBMIT LOGIN SSO (DENGAN SIMULASI SQL INJECTION)
+function submitLogin() {
+  const uInput = document.getElementById("loginUsername");
+  const pInput = document.getElementById("loginPassword");
+  if (!uInput || !pInput) return;
+
+  const username = uInput.value.trim();
+  const password = pInput.value.trim();
+  const users = getStorage("itsm_users", DEFAULT_USERS);
+
+  // SIMULASI VULNERABILITAS SQL INJECTION
+  if (username.includes("' OR '1'='1") || username.includes("' OR 1=1") || username.includes("'--")) {
+    logActivity("⚠️ SQL INJECTION AUTH BYPASS", `Statement: "${username}" berhasil membypass login!`);
+    showToast("⚠️ <b>SQL Injection Terpicu!</b> Autentikasi berhasil dibypass via statement <code>' OR '1'='1</code>. Masuk sebagai Super Administrator!", true);
+    const adminUser = users.find(u => u.role === "admin") || users[0];
+    localStorage.removeItem("itsm_logged_out");
+    currentUser = { ...adminUser };
+    setStorage("itsm_current_user", currentUser);
+    renderDashboardScreen();
+    return;
+  }
+
+  const found = users.find(u => (u.username === username || u.nomor_induk === username) && u.password === password);
+  if (found) {
+    localStorage.removeItem("itsm_logged_out");
+    currentUser = { ...found };
+    setStorage("itsm_current_user", currentUser);
+    showToast(`Selamat datang kembali, <b>${found.nama}</b>!`);
+    logActivity("Login Berhasil", `User: ${found.username} (${found.role})`);
+    renderDashboardScreen();
+  } else {
+    showToast("❌ Nomor Induk atau kata sandi tidak valid. Silakan coba lagi.", true);
+  }
+}
+
+// FUNGSI CEPAT GANTI AKUN
 function quickLogin(username) {
   const users = getStorage("itsm_users", DEFAULT_USERS);
   const u = users.find(x => x.username === username);
   if (u) {
+    localStorage.removeItem("itsm_logged_out");
     currentUser = { ...u };
     setStorage("itsm_current_user", currentUser);
-    updateHeaderProfile();
-    updateNavRoleTabs();
     showToast(`Beralih ke akun: <b>${u.nama}</b> [${u.role.toUpperCase()}]`);
-    navTo("beranda");
+    renderDashboardScreen();
   }
 }
 
+// FUNGSI LOGOUT SEBENARNYA
 function logout() {
-  // Reset kembali ke akun utama Meca dengan konfirmasi
-  showToast("Sesi di-reset ke akun utama Mahasiswa (Meca).");
-  quickLogin("meca");
+  logActivity("Logout Pengguna", `User: ${currentUser ? currentUser.nama : "Anonim"}`);
+  currentUser = null;
+  localStorage.removeItem("itsm_current_user");
+  localStorage.setItem("itsm_logged_out", "true");
+  showToast("Anda telah keluar dari sesi SIAKAD ITSM.");
+  renderAuthScreen();
 }
 
 function navTo(pageId) {
+  if (!currentUser) {
+    renderAuthScreen();
+    return;
+  }
   currentPage = pageId;
   document.querySelectorAll(".nav-tab-item").forEach(item => {
     item.classList.remove("active");

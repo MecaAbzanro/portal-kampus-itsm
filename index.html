@@ -97,8 +97,62 @@
     </div>
   </nav>
 
-  <!-- VIEWPORT UTAMA -->
-  <main class="portal-viewport">
+  <!-- LOGIN SSO SCREEN (Ditampilkan saat pengguna Logout) -->
+  <section id="authSection" class="sso-login-wrapper" style="display: none;" aria-label="Single Sign-On Login">
+    <div class="sso-banner-side">
+      <div>
+        <div class="sso-logo-icon">🎓</div>
+        <h2>Portal Akademik Terpadu ITSM</h2>
+        <p>Layanan Single Sign-On (SSO) resmi untuk mengakses Kartu Rencana Studi (KRS), Transkrip Nilai (KHS), E-Learning, dan Forum Akademik Institut Teknologi &amp; Sains Mandiri.</p>
+      </div>
+      <div style="font-size:11.5px; color:#cbd5e1; border-top:1px solid rgba(255,255,255,0.15); padding-top:14px;">
+        <b>Biro Administrasi Akademik &amp; Kemahasiswaan (BAAK)</b><br>
+        Gedung Rektorat Lt. 2 &middot; Email: puskom@itsm.ac.id
+      </div>
+    </div>
+
+    <div class="sso-form-side">
+      <div class="sso-form-header">
+        <h3>Masuk ke SIAKAD 4.0</h3>
+        <p>Gunakan Nomor Induk (NIM / NIDN) dan kata sandi SSO Anda</p>
+      </div>
+
+      <form id="ssoLoginForm" onsubmit="event.preventDefault(); submitLogin();">
+        <div class="form-field-row">
+          <label for="loginUsername">NIM / NIDN / Username:</label>
+          <input type="text" id="loginUsername" class="form-input-control" placeholder="Contoh: 24781078 atau meca" required autocomplete="username">
+        </div>
+
+        <div class="form-field-row">
+          <label for="loginPassword">Kata Sandi:</label>
+          <input type="password" id="loginPassword" class="form-input-control" placeholder="••••••••" required autocomplete="current-password">
+        </div>
+
+        <button type="submit" class="btn-siakad btn-primary" style="width:100%; padding:10px; font-size:13px; margin-top:6px;">
+          🔐 Masuk ke Portal SIAKAD
+        </button>
+      </form>
+
+      <div style="margin-top:14px; padding:10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; font-size:11px; color:#64748b;">
+        💡 <b>Uji Coba SQL Injection:</b> Masukkan username: <code style="color:#2563eb; font-weight:700;">' OR '1'='1 --</code> dengan sandi bebas untuk login otomatis sebagai Super Admin!
+      </div>
+
+      <!-- QUICK LOGIN CHIPS PADA LOGIN SCREEN -->
+      <div class="sso-quick-chips">
+        <div class="sso-quick-title">⚡ Masuk Cepat Akun Sintetis (1-Klik):</div>
+        <div class="sso-chip-grid">
+          <button type="button" class="sso-chip" onclick="quickLogin('meca')">👨‍🎓 Meca (Mhs 24781078)</button>
+          <button type="button" class="sso-chip" onclick="quickLogin('siti')">👩‍🎓 Siti (Mhs 24781015)</button>
+          <button type="button" class="sso-chip" onclick="quickLogin('budi')">👨‍🎓 Budi (Mhs 24781023)</button>
+          <button type="button" class="sso-chip" onclick="quickLogin('dosen_hendra')">👨‍🏫 Dr. Hendra (Dosen)</button>
+          <button type="button" class="sso-chip" onclick="quickLogin('admin_itsm')">👑 Admin IT Center</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- VIEWPORT UTAMA DASHBOARD -->
+  <main class="portal-viewport" id="portalViewport">
 
     <!-- LAB EVALUATION COMPACT BAR -->
     <section class="poc-lab-bar" aria-label="Informasi Evaluasi Keamanan">
